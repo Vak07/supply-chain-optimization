@@ -1,0 +1,11 @@
+# config/config.yaml
+
+data:
+  raw_data_path: "data/raw/data.csv"
+  processed_data_path: "data/processed/processed_data.csv"
+
+model:
+  target_column: "target"
+  n_estimators: 100
+  random_state: 42
+  model_path: "models/trained_model.pkl"
