@@ -1,72 +1,92 @@
-# src/data_preprocessing.py
-
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
 import numpy as np
+from sklearn.preprocessing import MinMaxScaler, StandardScaler, LabelEncoder
 
-class DataPreprocessing:
-    def __init__(self, config):
-        self.config = config
-
-    def preprocess_demand_data(self, demand_data):
-        """Preprocess the demand forecasting data."""
-        # Handle missing values
-        demand_data.fillna(method='ffill', inplace=True)
-
-        # Feature scaling
-        scaler = MinMaxScaler(feature_range=(0, 1))
-        demand_data_scaled = scaler.fit_transform(demand_data)
-        
-        print("Demand forecasting data preprocessed.")
-        return pd.DataFrame(demand_data_scaled), scaler
-
-    def preprocess_inventory_data(self, inventory_data):
-        """Preprocess the inventory management data."""
-        # Handle missing values
-        inventory_data.fillna(method='ffill', inplace=True)
-
-        # Convert categorical features to numeric if necessary
-        inventory_data = pd.get_dummies(inventory_data, drop_first=True)
-
-        # Feature scaling
-        scaler = StandardScaler()
-        inventory_data_scaled = scaler.fit_transform(inventory_data)
-        
-        print("Inventory management data preprocessed.")
-        return pd.DataFrame(inventory_data_scaled), scaler
-
-    def preprocess_route_data(self, route_data):
-        """Preprocess the route optimization data."""
-        # Handle missing values
-        route_data.fillna(0, inplace=True)
-
-        # Normalize data for GNN
-        scaler = MinMaxScaler(feature_range=(0, 1))
-        route_data_scaled = scaler.fit_transform(route_data)
-
-        print("Route optimization data preprocessed.")
-        return pd.DataFrame(route_data_scaled), scaler
-
-    def run(self, demand_data, inventory_data, route_data):
-        """Run preprocessing for all datasets."""
-        demand_data_processed, demand_scaler = self.preprocess_demand_data(demand_data)
-        inventory_data_processed, inventory_scaler = self.preprocess_inventory_data(inventory_data)
-        route_data_processed, route_scaler = self.preprocess_route_data(route_data)
-
-        return demand_data_processed, inventory_data_processed, route_data_processed, demand_scaler, inventory_scaler, route_scaler
-
-if __name__ == "__main__":
-    from configparser import ConfigParser
+def preprocess_demand_data(df):
+    """
+    Preprocess the demand data by scaling features, encoding categorical variables,
+    and handling missing values.
     
-    # Load configurations
-    config = ConfigParser()
-    config.read("config/config.yaml")
+    Args:
+    df (pd.DataFrame): Raw demand data.
 
+    Returns:
+    X (np.array): Features for training.
+    y (np.array): Target variable (next step demand).
+    scaler (MinMaxScaler): Scaler fitted on the features.
+    """
+    # Handle missing values (example: fill missing sales volumes with median)
+    df['Sales_Volume'].fillna(df['Sales_Volume'].median(), inplace=True)
+    
+    # Encode categorical variables (e.g., Seasonality, Promotion)
+    df['Seasonality'] = df['Seasonality'].fillna("Unknown")
+    label_encoder = LabelEncoder()
+    df['Seasonality'] = label_encoder.fit_transform(df['Seasonality'])
+    
+    # Feature scaling using MinMaxScaler
+    scaler = MinMaxScaler()
+    scaled_features = scaler.fit_transform(df[['Sales_Volume', 'Price', 'Promotion', 'Seasonality']])
+    
+    # Target: Next timestep sales volume (shift by 1)
+    target = df['Sales_Volume'].shift(-1).dropna()
+    scaled_features = scaled_features[:-1]  # Match lengths
+    
+    return np.array(scaled_features), np.array(target), scaler
+
+def preprocess_inventory_data(df):
+    """
+    Preprocess the inventory data by scaling features and handling missing values.
+    
+    Args:
+    df (pd.DataFrame): Raw inventory data.
+
+    Returns:
+    X (np.array): Scaled features for inventory.
+    scaler (StandardScaler): Scaler fitted on the features.
+    """
+    # Handle missing values (example: fill missing inventory levels with median)
+    df['Current_Inventory'].fillna(df['Current_Inventory'].median(), inplace=True)
+    
+    # Feature scaling using StandardScaler
+    scaler = StandardScaler()
+    scaled_data = scaler.fit_transform(df[['Current_Inventory', 'Reorder_Point', 'Lead_Time']])
+    
+    return scaled_data, scaler
+
+def preprocess_lagged_features(df, lag=1):
+    """
+    Create lag features for time-series data, adding previous sales values as new features.
+    
+    Args:
+    df (pd.DataFrame): Raw demand data.
+    lag (int): Number of previous timesteps to include as features.
+
+    Returns:
+    pd.DataFrame: Dataframe with added lagged features.
+    """
+    for i in range(1, lag + 1):
+        df[f'Sales_Lag_{i}'] = df['Sales_Volume'].shift(i)
+    
+    # Drop missing rows created due to lagging
+    df.dropna(inplace=True)
+    
+    return df
+
+# Example usage:
+if __name__ == "__main__":
     # Load datasets
-    demand_data = pd.read_csv(config["data"]["demand_data_path"])
-    inventory_data = pd.read_csv(config["data"]["inventory_data_path"])
-    route_data = pd.read_csv(config["data"]["route_data_path"])
-
-    # Preprocess datasets
-    preprocessor = DataPreprocessing(config)
-    preprocessed_data = preprocessor.run(demand_data, inventory_data, route_data)
+    demand_data = pd.read_csv('data/demand_data.csv')
+    inventory_data = pd.read_csv('data/inventory_data.csv')
+    
+    # Preprocess demand data with lag features
+    demand_data_lagged = preprocess_lagged_features(demand_data, lag=3)  # Example with 3 lags
+    X_demand, y_demand, scaler_demand = preprocess_demand_data(demand_data_lagged)
+    
+    # Preprocess inventory data
+    X_inventory, scaler_inventory = preprocess_inventory_data(inventory_data)
+    
+    # Example print statements
+    print("Preprocessed Demand Data (first 5 rows):")
+    print(X_demand[:5])
+    print("\nPreprocessed Inventory Data (first 5 rows):")
+    print(X_inventory[:5])

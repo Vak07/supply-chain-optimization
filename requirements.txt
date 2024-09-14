@@ -1,0 +1,28 @@
+# Data Handling and Preprocessing
+pandas==2.0.3
+numpy==1.24.3
+scikit-learn==1.2.2
+
+# Deep Learning Frameworks
+tensorflow==2.12.0
+keras==2.12.0
+torch==2.0.1
+torch-geometric==2.4.0
+
+# Experiment Tracking
+mlflow==2.7.1  # For managing and tracking machine learning experiments
+
+# Additional Packages
+matplotlib==3.7.1
+seaborn==0.12.2
+
+# Deployment and Web Frameworks
+fastapi==0.100.1
+uvicorn==0.23.0
+
+# Logging and Utilities
+loguru==0.7.0
+PyYAML==6.0
+
+# AWS SDK for Python (Optional for AWS deployment)
+boto3==1.28.2
